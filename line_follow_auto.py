@@ -3,8 +3,10 @@
     py line_follow_auto.py
 
 What happens:
- 1. If the camera (192.168.5.1) is not reachable, switches Wi-Fi to HW_ESP32S3CAM
-    (and switches back to the previous Wi-Fi on exit).
+ 1. If the camera (192.168.5.1) is not reachable, switches Wi-Fi ONCE to HW_ESP32S3CAM
+    (the BSSID in cam_bssid.txt if present - several teams' cameras share that name).
+    A Wi-Fi switch made by the user during the run is left alone; on exit the previous Wi-Fi
+    is restored only if the PC is still on the camera.
  2. Uploads robot/mechdog_rx.py to the robot RAM (flash untouched), robot stands up.
  3. First run only (or --calibrate): short turn test on the line to learn which turn
     direction moves the line which way in the image -> steer_calib.json.
@@ -61,12 +63,27 @@ def camera_reachable():
     return 'TTL=' in run(['ping', '-n', '1', '-w', '700', '192.168.5.1'])
 
 
+def pinned_bssid():
+    """cam_bssid.txt (local, gitignored): this team's camera when several share HW_ESP32S3CAM.
+    Create with: py tools\\find_my_camera.py --set <bssid>"""
+    p = os.path.join(HERE, 'cam_bssid.txt')
+    return open(p).read().strip().lower() if os.path.exists(p) else None
+
+
 def ensure_camera_wifi(log):
-    if camera_reachable():
+    import wifi_bssid
+    pin = pinned_bssid()
+    ssid, bssid = wifi_bssid.current()
+    if camera_reachable() and (not pin or bssid == pin):
         return None
-    prev = current_ssid()
-    log(f'Switching Wi-Fi {prev} -> {CAM_SSID}')
-    run(['netsh', 'wlan', 'connect', f'name={CAM_SSID}', f'ssid={CAM_SSID}'])
+    prev = ssid if ssid != CAM_SSID else None
+    if pin:
+        log(f'Switching Wi-Fi {ssid} -> {CAM_SSID} @ {pin}')
+        if not wifi_bssid.connect(pin):
+            raise RuntimeError(f'cannot join camera {pin} (powered? another camera nearby?)')
+    else:
+        log(f'Switching Wi-Fi {ssid} -> {CAM_SSID}')
+        run(['netsh', 'wlan', 'connect', f'name={CAM_SSID}', f'ssid={CAM_SSID}'])
     for _ in range(30):
         if camera_reachable():
             return prev
@@ -75,7 +92,8 @@ def ensure_camera_wifi(log):
 
 
 def restore_wifi(prev, log):
-    if prev and prev != CAM_SSID:
+    # only if still on the camera: a Wi-Fi the user picked during the run is left alone
+    if prev and prev != CAM_SSID and current_ssid() == CAM_SSID:
         log(f'Restoring Wi-Fi -> {prev}')
         run(['netsh', 'wlan', 'connect', f'name={prev}', f'ssid={prev}'])
 

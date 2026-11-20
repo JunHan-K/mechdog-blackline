@@ -91,8 +91,9 @@ class Robot:
         self.state = 'DISARMED'
         self.last_event = ''
 
-    def start(self, overrides=None):
-        """overrides: {'MAX_RUN_MS': 120000, ...} replaces 'NAME = value' lines in mechdog_rx.py."""
+    def start(self, overrides=None, init=True):
+        """overrides: {'MAX_RUN_MS': 120000, ...} replaces 'NAME = value' lines in mechdog_rx.py.
+        init=False: receiver only (head lamp etc.), MechDog not created, robot does not stand up."""
         code = open(RX_PATH, 'rb').read().decode()
         for name, value in (overrides or {}).items():
             pat = re.compile(r'^%s = .*$' % name, re.M)
@@ -103,6 +104,8 @@ class Robot:
         self.buf = self.b.send_code(code.encode())
         if not self.wait('ROBOT_READY RX2 dry=0', 5):
             raise BoardError('receiver did not start')
+        if not init:
+            return
         print('Receiver running. Initialising MechDog (robot may stand up, ~4 s)...')
         self.send('I')
         if not self.wait('INIT_OK', 10):

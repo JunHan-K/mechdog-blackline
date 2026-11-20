@@ -8,6 +8,7 @@
 #   0..8  -> heartbeat + proportional steering: raw turn level = digit-4 (-4..+4),
 #            move(STEP_FAST - |lvl|*STEP_DROP, lvl*TURN_UNIT). Sign is decided on the PC.
 #   Q -> status line           X -> exit to REPL (only while disarmed)
+#   G / E / B / O -> head lamp (ultrasonic RGB) green / red / blue / off -> 'LED x' (no motors, no init needed)
 #   Ctrl-C -> KeyboardInterrupt -> motors stopped, back to REPL
 #
 # Safety (software only - the power switch is the real emergency stop):
@@ -42,6 +43,22 @@ for _d in range(9):
 
 _g = globals()
 dog = _g.get('dog')      # reuse an instance created earlier in this boot (never make two)
+sonar = _g.get('sonar')
+LED_RGB = {'G': (0, 255, 0), 'E': (255, 0, 0), 'B': (0, 0, 255), 'O': (0, 0, 0)}
+
+
+def set_led(c):
+    global sonar
+    try:
+        if sonar is None:
+            import Hiwonder_IIC
+            sonar = Hiwonder_IIC.I2CSonar(Hiwonder_IIC.IIC(1))
+            _g['sonar'] = sonar
+        r, g, b = LED_RGB[c]
+        sonar.setRGB(0, r, g, b)
+        log('LED', c)
+    except Exception as e:
+        log('LED_ERR', repr(e))
 
 
 def log(*a):
@@ -128,6 +145,8 @@ class Rx:
             if self.armed:
                 self.last_rx = now
                 self.desired = c
+        elif c in LED_RGB:
+            set_led(c)
         elif c == 'Q':
             gc.collect()
             log('STATUS armed=%d cur=%s dry=%d init=%d gc=%d' % (

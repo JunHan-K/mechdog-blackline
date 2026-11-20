@@ -5,3 +5,9 @@ logs/
 robot_backup/
 # Per-robot/camera calibration, regenerated with --calibrate
 steer_calib.json
+# This team's camera BSSID (several cameras share HW_ESP32S3CAM)
+cam_bssid.txt
+# Empty-scene background for hazard_check.py (fixed camera view)
+hazard_bg.png
+# Per-camera colour calibration of vest_check.py (keys v/t + s)
+vest_config.json
