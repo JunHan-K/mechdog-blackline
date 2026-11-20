@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+logs/
+# Copies of the robot flash (contain Hiwonder vendor code) - keep local only
+robot_backup/
+# Per-robot/camera calibration, regenerated with --calibrate
+steer_calib.json
